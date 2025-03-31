@@ -1,4 +1,4 @@
-from src.jobs import job_1
+from src.jobs import bronze
 
 if __name__ == "__main__":
-    job_1.start()
+    bronze.start()

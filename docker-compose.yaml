@@ -1,5 +1,4 @@
 services:
-
   spark-master:
     build: .
     command: bin/spark-class org.apache.spark.deploy.master.Master
@@ -9,6 +8,7 @@ services:
     volumes:
       - ./src:/opt/bitnami/spark/src
       - ./tests:/opt/bitnami/spark/tests
+      - ./data:/opt/bitnami/spark/spark-warehouse
 
   spark-worker-1:
     build: .
@@ -31,3 +31,14 @@ services:
       SPARK_WORKER_CORES: 2
       SPARK_WORKER_MEMORY: 2g
       SPARK_MASTER_URL: spark://spark-master:7077
+
+  dremio:
+    container_name: dremio
+    image: dremio/dremio-oss
+    volumes:
+      - ./data:/mnt/myshare
+    ports:
+      - "9047:9047"
+      - "31010:31010"
+      - "32010:32010"
+      - "45678:45678"
