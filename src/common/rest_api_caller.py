@@ -2,7 +2,6 @@ import requests
 import json
 
 def get(url):
-    #
     headers = {
         'Content-Type': "application/json",
         'User-Agent': "apache spark 3.x"
