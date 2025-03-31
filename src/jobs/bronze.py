@@ -29,30 +29,29 @@ def get_total_breweries():
     return meta_json["total"]
 
 
-def start():
-    spark: SparkSession = (SparkSession.builder
-                           .appName("BronzeBreweriesJob")
-                           .getOrCreate())
+spark: SparkSession = (SparkSession.builder
+                        .appName("BronzeBreweriesJob")
+                        .getOrCreate())
 
-    reqs = []
-    rest_api_url = Row("url")
-    per_page = 200
-    total_pages = int(get_total_breweries() / per_page)
-    for pageIdx in range(1, total_pages):
-        reqs.append(rest_api_url(f"https://api.openbrewerydb.org/v1/breweries?page={pageIdx}&per_page={per_page}"))
+reqs = []
+rest_api_url = Row("url")
+per_page = 200
+total_pages = int(get_total_breweries() / per_page)
+for pageIdx in range(1, total_pages):
+    reqs.append(rest_api_url(f"https://api.openbrewerydb.org/v1/breweries?page={pageIdx}&per_page={per_page}"))
 
-    df = spark.createDataFrame(reqs)
+df = spark.createDataFrame(reqs)
 
-    udf_getRestApi = udf(get, StringType())
-    df = df.withColumn("result", udf_getRestApi(col("url")))
+udf_getRestApi = udf(get, StringType())
+df = df.withColumn("result", udf_getRestApi(col("url")))
 
-    json_schema = schema_of_json(df.select("result").first()[0])
-    df = (df.withColumn("result_json", from_json(col("result"), json_schema))
-          .selectExpr("explode(result_json) as brewery")
-          .selectExpr("brewery.*"))
+json_schema = schema_of_json(df.select("result").first()[0])
+df = (df.withColumn("result_json", from_json(col("result"), json_schema))
+        .selectExpr("explode(result_json) as brewery")
+        .selectExpr("brewery.*"))
 
-    (df
-     .write
-     .mode("overwrite")
-     .option("mergeSchema", True)
-     .save("spark-warehouse/breweries_bronze"))
+(df
+    .write
+    .mode("overwrite")
+    .option("mergeSchema", True)
+    .save("spark-warehouse/breweries_bronze"))
