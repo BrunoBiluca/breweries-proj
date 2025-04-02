@@ -1,10 +1,8 @@
+import requests
+import json
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import udf, col, schema_of_json, from_json
 from pyspark.sql.types import StringType, Row
-
-
-import requests
-import json
 
 
 def get(url):
