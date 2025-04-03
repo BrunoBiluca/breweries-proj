@@ -99,6 +99,16 @@ Assim, foi desenvolvido um UDF (User Defined Function) para fazer essas requisi�
 
 Para isso partimos do endpoint `Metadata` que provê a quantidade de cervejaria e dividimos isso me páginas.
 
+### Tratamento de erros
+
+O Job `breweries_bronze` pode apresentar as seguintes exceções:
+
+- Falha ao buscar os metadados
+- Falha ao analisar os metadados
+- Falha ao buscar os dados de cervejarias
+
+Para qualquer um dos casos acima o Job irá ser encerrado e marcado como falha.
+
 ## breweries_silver
 
 **Objetivo:** refinamento dos dados de cervejaria e particionamento para preparar os dados para futuros processamentos analíticos.
