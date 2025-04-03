@@ -19,55 +19,70 @@ def get(url):
 
 def get_total_breweries():
     meta = get("https://api.openbrewerydb.org/v1/breweries/meta")
-    
+
     if meta[0] != 200:
         raise Exception("Failed to get breweries meta with code: " + str(meta[0]) + "\n" + meta[1])
-    
+
     try:
         meta_json = json.loads(meta[1])
         total = meta_json["total"]
     except Exception:
         raise Exception("Failed to parse breweries meta: " + meta[1])
-    
+
     print("Total breweries: " + str(total))
     return total
 
 
-spark: SparkSession = (SparkSession.builder
-                       .appName("BronzeBreweriesJob")
-                       .getOrCreate())
+def format_requests():
+    reqs = []
+    rest_api_url = Row("url")
+    per_page = 200
+    total_pages = int(get_total_breweries() / per_page)
+    for pageIdx in range(1, total_pages):
+        reqs.append(rest_api_url(f"https://api.openbrewerydb.org/v1/breweries?page={pageIdx}&per_page={per_page}"))
 
-reqs = []
-rest_api_url = Row("url")
-per_page = 200
-total_pages = int(get_total_breweries() / per_page)
-for pageIdx in range(1, total_pages):
-    reqs.append(rest_api_url(f"https://api.openbrewerydb.org/v1/breweries?page={pageIdx}&per_page={per_page}"))
+    return reqs
 
-df = spark.createDataFrame(reqs)
 
-udf_getRestApi = udf(get, returnType=StructType([
-    StructField("status_code", IntegerType(), True),
-    StructField("text", StringType(), True)
-]))
-df = (df.withColumn("result", udf_getRestApi(col("url")))
-      .select(col("url"), col("result.status_code").alias("status_code"), col("result.text").alias("result_text")))
+def parse_requests_results(df):
+    udf_getRestApi = udf(get, returnType=StructType([
+        StructField("status_code", IntegerType(), True),
+        StructField("text", StringType(), True)
+    ]))
+    df = (df.withColumn("result", udf_getRestApi(col("url")))
+          .select(
+              col("url"),
+              col("result.status_code").alias("status_code"),
+              col("result.text").alias("result_text")
+    )
+    )
+    return df
 
+
+def validate_requests(df):
+    requests_not_ok = df.filter(col("status_code") != 200).count()
+    if requests_not_ok > 0:
+        raise Exception("Some requests failed: " + str(requests_not_ok))
+    else:
+        print("All requests ok")
+
+
+def parse_breweries(df):
+    json_schema = schema_of_json(df.select("result_text").first()[0])
+    return (df.withColumn("result_json", from_json(col("result_text"), json_schema))
+            .selectExpr("explode(result_json) as brewery")
+            .selectExpr("brewery.*"))
+
+
+spark: SparkSession = SparkSession.builder.appName("BronzeBreweriesJob").getOrCreate()
+df = spark.createDataFrame(format_requests())
+df = parse_requests_results(df)
 df.cache()
-
-requests_not_ok =  df.filter(col("status_code") != 200).count()
-if requests_not_ok > 0:
-    raise Exception("Some requests failed: " + str(requests_not_ok))
-else:
-    print("All requests ok")
-
-json_schema = schema_of_json(df.select("result_text").first()[0])
-df = (df.withColumn("result_json", from_json(col("result_text"), json_schema))
-        .selectExpr("explode(result_json) as brewery")
-        .selectExpr("brewery.*"))
-
+validate_requests(df)
+df = parse_breweries(df)
 (df
     .write
+    .format("parquet")
     .mode("overwrite")
     .option("mergeSchema", True)
     .save("spark-warehouse/breweries_bronze"))
