@@ -66,8 +66,8 @@ df = (df.withColumn("result_json", from_json(col("result_text"), json_schema))
         .selectExpr("explode(result_json) as brewery")
         .selectExpr("brewery.*"))
 
-# (df
-#     .write
-#     .mode("overwrite")
-#     .option("mergeSchema", True)
-#     .save("spark-warehouse/breweries_bronze"))
+(df
+    .write
+    .mode("overwrite")
+    .option("mergeSchema", True)
+    .save("spark-warehouse/breweries_bronze"))
